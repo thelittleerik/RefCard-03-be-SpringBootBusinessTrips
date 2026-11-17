@@ -5,10 +5,15 @@ Trips, Flüge, Meetings). Teil der CI/CD-Übungssequenz **RefCard 02–05**
 (siehe [`docs/future/RefCard-03-RefCard-05-own-repos.md`](docs/future/RefCard-03-RefCard-05-own-repos.md))
 — dieses Repository ist **RefCard 03**: Spring Boot Backend mit MariaDB.
 
+> **RefCard 05 – Full-Stack auf AWS.** Dieser Fork ist die Abgabe von Erik Oros und Sven Toye.
+> Das Backend läuft als ECS-Service (Fargate) mit RDS-MariaDB und S3. Vorgehen, Architektur und
+> Nachweise stehen in [`docs/RefCard05.md`](docs/RefCard05.md).
+
 ## Tech-Stack
 
 - Java 21, Spring Boot 4.1 (Web, Data JPA)
-- MariaDB (lokal via Docker Compose) / H2 (Default, für Tests und schnellen lokalen Start)
+- MariaDB (lokal via Docker Compose, auf AWS als RDS) / H2 (Default, für Tests und schnellen lokalen Start)
+- Bild-Storage: lokales Dateisystem (Default) oder Amazon S3 (AWS SDK v2)
 - Maven (Maven Wrapper, kein lokales Maven nötig)
 
 ## Schnellstart
@@ -48,14 +53,33 @@ Basis-Pfad: `/v1`
 | `GET /v1/employees`, `POST /v1/employees`, `GET /v1/employees/{id}`, `PUT /v1/employees/{id}`, `DELETE /v1/employees/{id}`, `DELETE /v1/employees` | Mitarbeitende |
 | `GET /v1/flights`, `POST /v1/flights`, `GET /v1/flights/{id}`, `PUT /v1/flights/{id}`, `DELETE /v1/flights/{id}`, `DELETE /v1/flights` | Flüge |
 | `GET /v1/meetings`, `POST /v1/meetings`, `GET /v1/meetings/{id}`, `PUT /v1/meetings/{id}`, `DELETE /v1/meetings/{id}`, `DELETE /v1/meetings` | Meetings |
+| `POST /v1/employees/{id}/photo`, `GET /v1/employees/{id}/photo`, `DELETE /v1/employees/{id}/photo` | Foto eines Mitarbeitenden (Upload als `multipart/form-data`, Feld `file`; PNG, JPEG oder WebP bis 5 MB) |
 | `POST /v1/signIn` | Login (Demo-User: `joe` / `1234`) |
 | `GET /actuator/health` | Health-Check (Spring Boot Actuator) — prüft u. a. die Datenbankverbindung |
+| `GET /actuator/info` | Ausgelieferte Version und Commit |
+
+## Profile
+
+| Profil | Datenbank | Bild-Storage | Verwendung |
+| --- | --- | --- | --- |
+| *(Default)* | H2, im Speicher | lokales Verzeichnis `./uploads` | Tests, schneller Start |
+| `mariadb` | MariaDB aus `docker/docker-compose.yml` | lokales Verzeichnis `./uploads` | lokale Entwicklung am Backend |
+| `aws` | MariaDB, Verbindungsdaten aus Umgebungsvariablen | S3-Bucket | ECS, und lokal im Gesamtsystem ([refcard-05-compose](https://github.com/thelittleerik/refcard-05-compose)) |
+
+Das Profil `aws` enthält keine Zugangsdaten und keine Defaults für Host, Benutzer oder Passwort. Es erwartet
+`DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` und `S3_BUCKET` (optional `DB_PORT`); fehlt eine
+Variable, startet die Applikation nicht.
 
 ## Projektstruktur
 
 ```
 src/main/java/ch/bbw/trips/   Applikationscode (Controller, Entities, Repositories, DTOs)
 docker/docker-compose.yml     MariaDB + phpMyAdmin für die lokale Entwicklung
+.github/workflows/deploy.yml  Pipeline: Test → Build → Image nach ECR → Deploy auf ECS → Smoke-Test
+task-definition.json          ECS-Task-Definition (Fargate)
+infra/                        AWS-Infrastruktur anlegen, Passwort rotieren, wieder löschen
+scripts/                      Smoke-Test und Erneuern der Learner-Lab-Secrets
+docs/RefCard05.md             Dokumentation der RefCard-05-Lösung
 docs/exercises/               CI/CD-Übungen (EX-01 EC2, EX-02 Docker Hub, EX-03 ECS/RDS)
 docs/reviews/                 Code-Reviews
 docs/future/                  Planungsentscheidungen für RefCard 03–05
