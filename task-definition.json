@@ -4,24 +4,34 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::211125356770:role/LabRole",
+  "runtimePlatform": { "cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX" },
+  "executionRoleArn": "arn:aws:iam::187283686786:role/LabRole",
+  "taskRoleArn": "arn:aws:iam::187283686786:role/LabRole",
   "containerDefinitions": [
     {
       "name": "biztrips-backend",
-      "image": "211125356770.dkr.ecr.us-east-1.amazonaws.com/biztrips-backend:latest",
+      "image": "187283686786.dkr.ecr.us-east-1.amazonaws.com/biztrips-backend:latest",
       "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
       "essential": true,
+      "stopTimeout": 30,
       "environment": [
-        { "name": "SPRING_PROFILES_ACTIVE", "value": "mariadb" },
-        { "name": "SPRING_DATASOURCE_URL", "value": "jdbc:mariadb://biztrips-backend-db.ctgyqyg6io6a.us-east-1.rds.amazonaws.com:3306/db_biztrips" },
-        { "name": "SPRING_DATASOURCE_USERNAME", "value": "admin" }
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "S3_BUCKET", "value": "biztrips-employee-photos-187283686786-us-east-1" }
       ],
       "secrets": [
-        {
-          "name": "SPRING_DATASOURCE_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:211125356770:secret:biztrips-backend-db-password"
-        }
+        { "name": "DB_HOST", "valueFrom": "arn:aws:secretsmanager:us-east-1:187283686786:secret:biztrips/backend/db-Df2KpX:host::" },
+        { "name": "DB_PORT", "valueFrom": "arn:aws:secretsmanager:us-east-1:187283686786:secret:biztrips/backend/db-Df2KpX:port::" },
+        { "name": "DB_NAME", "valueFrom": "arn:aws:secretsmanager:us-east-1:187283686786:secret:biztrips/backend/db-Df2KpX:dbname::" },
+        { "name": "DB_USERNAME", "valueFrom": "arn:aws:secretsmanager:us-east-1:187283686786:secret:biztrips/backend/db-Df2KpX:username::" },
+        { "name": "DB_PASSWORD", "valueFrom": "arn:aws:secretsmanager:us-east-1:187283686786:secret:biztrips/backend/db-Df2KpX:password::" }
       ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1"],
+        "interval": 15,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 90
+      },
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
