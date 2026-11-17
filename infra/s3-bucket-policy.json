@@ -1,0 +1,55 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyInsecureTransport",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::__BUCKET__",
+        "arn:aws:s3:::__BUCKET__/*"
+      ],
+      "Condition": { "Bool": { "aws:SecureTransport": "false" } }
+    },
+    {
+      "Sid": "AllowBackendTaskRoleObjectAccess",
+      "Effect": "Allow",
+      "Principal": { "AWS": "__TASK_ROLE_ARN__" },
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::__BUCKET__/__PREFIX__*"
+    },
+    {
+      "Sid": "DenyTaskRoleOtherActions",
+      "Effect": "Deny",
+      "Principal": { "AWS": "__TASK_ROLE_ARN__" },
+      "NotAction": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::__BUCKET__",
+        "arn:aws:s3:::__BUCKET__/*"
+      ]
+    },
+    {
+      "Sid": "DenyTaskRoleOutsidePrefix",
+      "Effect": "Deny",
+      "Principal": { "AWS": "__TASK_ROLE_ARN__" },
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "NotResource": "arn:aws:s3:::__BUCKET__/__PREFIX__*"
+    },
+    {
+      "Sid": "DenyEveryOtherPrincipal",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::__BUCKET__",
+        "arn:aws:s3:::__BUCKET__/*"
+      ],
+      "Condition": {
+        "ArnNotEquals": {
+          "aws:PrincipalArn": ["__TASK_ROLE_ARN__", "__ADMIN_ROLE_ARN__"]
+        }
+      }
+    }
+  ]
+}
