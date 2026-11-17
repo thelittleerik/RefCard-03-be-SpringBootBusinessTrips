@@ -30,6 +30,8 @@ public class Employee implements Serializable {
 	@JsonIgnore
 	private String token;
 
+	private String profilePictureFilename;
+
 	@OneToMany(mappedBy = "employee")
 	@JsonManagedReference
 	private List<Flight> flights;

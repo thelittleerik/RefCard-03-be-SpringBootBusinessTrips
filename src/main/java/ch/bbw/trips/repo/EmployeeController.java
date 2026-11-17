@@ -5,11 +5,17 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ch.bbw.trips.storage.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +31,9 @@ public class EmployeeController {
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private StorageService storageService;
 
 	@PostMapping("/signIn")
 	@ResponseStatus(HttpStatus.OK)
@@ -94,6 +103,55 @@ public class EmployeeController {
 	@DeleteMapping("/employees")
 	void deleteAllEmployees() {
 		employeeRepository.deleteAll();
+	}
+
+	@PostMapping("/employees/{id}/photo")
+	Employee uploadPhoto(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+		Employee employee = employeeRepository.findById(id).orElseThrow(() -> new TriptNotFoundException(id));
+		String previous = employee.getProfilePictureFilename();
+
+		employee.setProfilePictureFilename(storageService.store(file));
+		Employee saved = employeeRepository.save(employee);
+
+		if (previous != null) {
+			deleteQuietly(previous);
+		}
+		return saved;
+	}
+
+	@GetMapping("/employees/{id}/photo")
+	ResponseEntity<Resource> downloadPhoto(@PathVariable Long id) {
+		Employee employee = employeeRepository.findById(id).orElseThrow(() -> new TriptNotFoundException(id));
+		String filename = employee.getProfilePictureFilename();
+		if (filename == null) {
+			return ResponseEntity.notFound().build();
+		}
+		return ResponseEntity.ok()
+				.contentType(MediaTypeFactory.getMediaType(filename).orElse(MediaType.APPLICATION_OCTET_STREAM))
+				.cacheControl(CacheControl.noCache())
+				.body(storageService.load(filename));
+	}
+
+	@DeleteMapping("/employees/{id}/photo")
+	ResponseEntity<Void> deletePhoto(@PathVariable Long id) {
+		Employee employee = employeeRepository.findById(id).orElseThrow(() -> new TriptNotFoundException(id));
+		String filename = employee.getProfilePictureFilename();
+		if (filename != null) {
+			storageService.delete(filename);
+			employee.setProfilePictureFilename(null);
+			employeeRepository.save(employee);
+		}
+		return ResponseEntity.noContent().build();
+	}
+
+	// Das neue Foto ist bereits gespeichert und verknüpft; ein nicht löschbares altes Objekt
+	// soll den Upload nicht nachträglich scheitern lassen.
+	private void deleteQuietly(String filename) {
+		try {
+			storageService.delete(filename);
+		} catch (RuntimeException e) {
+			log.warn("Altes Foto {} konnte nicht gelöscht werden: {}", filename, e.getMessage());
+		}
 	}
 
 }
