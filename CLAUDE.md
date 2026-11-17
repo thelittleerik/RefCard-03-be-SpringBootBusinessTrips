@@ -40,11 +40,33 @@ Sub-packages: `repo` (entities + controllers + Spring Data repositories, all in 
 (the 404 exception + `@ControllerAdvice`), `web` (a legacy `HomeController` returning Thymeleaf-style view
 names that don't have templates — dead/broken, not part of the REST API).
 
-### Two datasource profiles, one seed data path
+### Three profiles, one seed data path
 
-- Default profile: embedded H2, ephemeral, reseeded fresh on every start.
+- Default profile: embedded H2, ephemeral, reseeded fresh on every start. Photos go to `./uploads`.
 - `mariadb` profile (`application-mariadb.properties`): points at `docker/docker-compose.yml`'s MariaDB
   (`db_biztrips` / `root` / `bbw123`, same credentials in both places — keep them in sync if you change one).
+- `aws` profile (`application-aws.properties`): RDS MariaDB and S3. It has **no** credentials and no defaults
+  for host, user or password — `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` and `S3_BUCKET` must be set
+  or the app does not start. On ECS they come from Secrets Manager (`task-definition.json`); locally the
+  `refcard-05-compose` repo sets them and points S3 at MinIO. Never add credentials or defaults to this file.
+
+### Photo storage (RefCard 04/05)
+
+`ch.bbw.trips.storage.StorageService` has two implementations selected by `app.storage.type`:
+`LocalStorageService` (`local`, default) and `S3StorageService` (`s3`, wired in `S3StorageConfig`).
+`EmployeeController` only knows the interface. Storage failures are `StorageException` with a `Reason`,
+mapped to HTTP status codes in `ex/StorageAdvice` (missing bucket permissions → 502, unreachable → 503).
+
+`application.properties` sets `logging.level.org.hibernate.orm.connections.pooling=WARN` on purpose:
+Hibernate logs the JDBC URL at startup and the MariaDB driver appends user and password to it. Removing
+that line puts the database password into CloudWatch.
+
+### RefCard 05 deployment
+
+`docs/RefCard05.md` documents the AWS setup. `infra/setup-aws.sh` creates everything (idempotent),
+`infra/teardown-aws.sh` removes it, `infra/config.sh` holds the resource names shared with the frontend
+repo. The pipeline (`.github/workflows/deploy.yml`) deploys on pushes to `main` and on `vX.Y.Z` tags and
+then runs `scripts/smoke-test.sh` against the load balancer. Documentation-only commits do not trigger it.
 
 `BusinessTripsBackendApplication.demoData()` (a `CommandLineRunner`) seeds Employees/Flights/Trips/Meetings.
 It's guarded by `employeeRepository.count() > 0` — restarting against a persistent DB (MariaDB) will **not**
